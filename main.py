@@ -168,11 +168,13 @@ for root_path in root_paths[:]:
     filter_paths = sorted(filter_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
     # [99,99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9]
-    thresholds_filter = get_thresholds(filter_paths, quatiles=[90,99,99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9], bits=8)
-    thr_filter = thresholds_filter[99.4]
+    thresholds_filter = get_thresholds(filter_paths, quatiles=[95,96,97,98,99,\
+                                                               99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9], bits=8)
 
     thresholds_thr = get_thresholds(tif_paths, quatiles=np.linspace(99,100,10,endpoint=False), bits=8)
-    thr_thr = thresholds_thr[99.2]
+    
+    # thr_filter = thresholds_filter[99.4]
+    # thr_thr = thresholds_thr[99.2]
 
     # counts1, bins1 = np.histogram(volumn1, bins=100)
     # counts2, bins2 = np.histogram(volumn2, bins=100)
@@ -183,14 +185,11 @@ for root_path in root_paths[:]:
 
     save_tif = False
     idx = list(np.arange(len(tif_paths)))
-    for thr in np.linspace(99,100,10,endpoint=False):
+    for thr in [95,96,97,98,99,99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9]:
         thr_filter = thresholds_filter[thr]
-        thr_thr = thresholds_thr[thr]
 
         save_fil_mask_dir = os.path.join(root_path, f'3_filter_mask_{thr}')
-        save_thr_mask_dir = os.path.join(root_path, f'3_thr_mask_{thr}')
         os.makedirs(save_fil_mask_dir, exist_ok=True)
-        os.makedirs(save_thr_mask_dir, exist_ok=True)
 
         for i, path in zip(idx, tif_paths):
             print(i)
@@ -215,7 +214,25 @@ for root_path in root_paths[:]:
                 img.save(save_path)
             ###################################################################
 
+        filter_mask_paths = glob.glob(os.path.join(save_fil_mask_dir, f'*.png'))
+        filter_mask_paths = sorted(filter_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
+        step = 4
+        ############## loc thichness of filter mask ##############
+        filter_loc = get_loc_thichness(filter_mask_paths, step=step)
+        save_html = os.path.join(root_path, f'loc_filter_{thr}.html')
+        plot_3d_save(filter_loc>0, value_map=filter_loc, save_html=save_html)
+        # plot_3d_show(mask_filter, mask_diamfilter_loceter_filter)
+
+
+    for thr in np.linspace(99,100,10,endpoint=False):
+        thr_thr = thresholds_thr[thr]
+
+        save_thr_mask_dir = os.path.join(root_path, f'3_thr_mask_{thr}')
+        os.makedirs(save_thr_mask_dir, exist_ok=True)
+
+        for i, path in zip(idx, tif_paths):
+            print(i)
 
             ##################### mask by threshold ####################
             arr_orig = np.array(Image.open(path))
@@ -237,19 +254,10 @@ for root_path in root_paths[:]:
             ############################################################
 
 
-        filter_mask_paths = glob.glob(os.path.join(save_fil_mask_dir, f'*.png'))
-        filter_mask_paths = sorted(filter_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
-
         thr_mask_paths = glob.glob(os.path.join(save_thr_mask_dir, f'*.png'))
         thr_mask_paths = sorted(thr_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
         step = 4
-        ############## loc thichness of filter mask ##############
-        filter_loc = get_loc_thichness(filter_mask_paths, step=step)
-        save_html = os.path.join(root_path, f'loc_filter_{thr}.html')
-        plot_3d_save(filter_loc>0, value_map=filter_loc, save_html=save_html)
-        # plot_3d_show(mask_filter, mask_diamfilter_loceter_filter)
-
         ############## loc thichness of threshold mask ##############
         thr_loc = get_loc_thichness(thr_mask_paths, step=step)
         save_html = os.path.join(root_path, f'loc_thr_{thr}.html')
