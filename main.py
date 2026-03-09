@@ -89,51 +89,54 @@ def plot_3d_save(mask, spacing_zyx=[1,1,1], value_map=None, save_html=None, seed
     # fig.show()
 
 
+def get_loc_thichness(paths, step=1):
+    volumn = []
+    for path in paths[::step]:
+        array = np.array(Image.open(path))>0
+        array = array[::step,::step]
+        volumn.append(array)
+    volumn = np.array(volumn)
+    loc_thichness = qim3d.processing.local_thickness(volumn, visualize=False, axis=0)
+    return loc_thichness
+
+
 num_re = re.compile(r'(\d+)(?!.*\d)')
 
 # root_path = glob.glob(os.path.join(os.getcwd(),'data/241030_652__11-18-58'))[0]
 root_paths = glob.glob(os.path.join(os.getcwd(),'data/*'))
 print(root_paths)
 
-for root_path in root_paths[-2:]:
+for root_path in root_paths[:]:
     print(root_path)
     tif_paths = glob.glob(os.path.join(root_path, '2_8bit/*'))
     tif_paths = sorted(tif_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
 
     save_fil_dir = os.path.join(root_path, '3_filter')
-    save_fil_mask_dir = os.path.join(root_path, '3_filter_mask')
-    save_thr_mask_dir = os.path.join(root_path, '3_thr_mask')
-    save_mask_dir = os.path.join(root_path, '4_mask')
-    save_thickness_dir = os.path.join(root_path, '5_thickness')
     os.makedirs(save_fil_dir, exist_ok=True)
-    os.makedirs(save_fil_mask_dir, exist_ok=True)
-    os.makedirs(save_thr_mask_dir, exist_ok=True)
-    os.makedirs(save_mask_dir, exist_ok=True)
-    os.makedirs(save_thickness_dir, exist_ok=True)
     idx = list(np.arange(len(tif_paths)))
 
 
-    ###################### process image by filter #########################
+    # ###################### process image by filter #########################
 
-    for i, path in zip(idx, tif_paths):
-        print(i)
-        arr_ = np.array(Image.open(path))
+    # for i, path in zip(idx, tif_paths):
+    #     print(i)
+    #     arr_ = np.array(Image.open(path))
 
-        arr = filters.gaussian(arr_, sigma=1, preserve_range=True)
-        #arr = frangi(arr, sigmas=np.arange(.1,20,1), black_ridges=False)
-        arr = sato(arr, sigmas=np.arange(.01,6,.3), black_ridges=False)
-        #arr = meijering(arr, sigmas=np.arange(.01,4,.2), black_ridges=False)
-        #arr = hessian(ararrr_, sigmas=[1,2,3,3,5])
+    #     arr = filters.gaussian(arr_, sigma=1, preserve_range=True)
+    #     #arr = frangi(arr, sigmas=np.arange(.1,20,1), black_ridges=False)
+    #     arr = sato(arr, sigmas=np.arange(.01,6,.3), black_ridges=False)
+    #     #arr = meijering(arr, sigmas=np.arange(.01,4,.2), black_ridges=False)
+    #     #arr = hessian(ararrr_, sigmas=[1,2,3,3,5])
 
-        # Normalize per-slice (or globally if preferred)
-        arr_norm = arr / arr.max() if arr.max() != 0 else arr
-        arr_filter = (arr_norm * 255).astype(np.uint8)
+    #     # Normalize per-slice (or globally if preferred)
+    #     arr_norm = arr / arr.max() if arr.max() != 0 else arr
+    #     arr_filter = (arr_norm * 255).astype(np.uint8)
 
-        img = Image.fromarray(arr_filter)
-        save_path = os.path.join(save_fil_dir, f'sato_{i:04d}.tif')
-        img.save(save_path)
-        ########################################################################
+    #     img = Image.fromarray(arr_filter)
+    #     save_path = os.path.join(save_fil_dir, f'sato_{i:04d}.tif')
+    #     img.save(save_path)
+    # #########################################################################
 
 
     ##### get thresholds #####
@@ -164,13 +167,12 @@ for root_path in root_paths[-2:]:
     filter_paths = glob.glob(os.path.join(save_fil_dir, f'sato_*.tif'))
     filter_paths = sorted(filter_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
-    thresholds_filter = get_thresholds(filter_paths, quatiles=[99], bits=8)
-    thr_filter = thresholds_filter[99]
+    # [99,99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9]
+    thresholds_filter = get_thresholds(filter_paths, quatiles=[90,99,99.1,99.2,99.3,99.4,99.5,99.6,99.7,99.8,99.9], bits=8)
+    thr_filter = thresholds_filter[99.4]
 
-    thresholds_thr = get_thresholds(tif_paths, quatiles=[99], bits=8)
-    thr_thr = thresholds_thr[99]
-
-
+    thresholds_thr = get_thresholds(tif_paths, quatiles=np.linspace(99,100,10,endpoint=False), bits=8)
+    thr_thr = thresholds_thr[99.2]
 
     # counts1, bins1 = np.histogram(volumn1, bins=100)
     # counts2, bins2 = np.histogram(volumn2, bins=100)
@@ -181,127 +183,75 @@ for root_path in root_paths[-2:]:
 
     save_tif = False
     idx = list(np.arange(len(tif_paths)))
-    for i, path in zip(idx, tif_paths):
-        print(i)
+    for thr in np.linspace(99,100,10,endpoint=False):
+        thr_filter = thresholds_filter[thr]
+        thr_thr = thresholds_thr[thr]
 
-        ################### filter mask by threhold ######################
-        arr_filter = np.array(Image.open(os.path.join(save_fil_dir, f'sato_{i:04d}.tif')))
-        # thr_filter = 50
-        mask_filter = arr_filter>thr_filter
-        # #mask_filter = apply_hysteresis_threshold(arr_filter, low=15, high=100)
-        # #mask_filter = filters.threshold_local(arr_filter, block_size=11,method='gaussian',offset=-.01)
-        # mask_filter = morphology.binary_closing(mask_filter, morphology.disk(1))
-        # mask_filter = morphology.remove_small_objects(mask_filter, min_size=15)
-        # arr_filter[~mask_filter] = 0
+        save_fil_mask_dir = os.path.join(root_path, f'3_filter_mask_{thr}')
+        save_thr_mask_dir = os.path.join(root_path, f'3_thr_mask_{thr}')
+        os.makedirs(save_fil_mask_dir, exist_ok=True)
+        os.makedirs(save_thr_mask_dir, exist_ok=True)
 
-        if save_tif:
-            mask_filter = mask_filter.astype(np.uint8) * 255
-            save_path = os.path.join(save_fil_mask_dir, f'fil_mask_{i:04d}.tif')
-            tiff.imwrite(save_path, mask_filter)
-        else:
-            save_path = os.path.join(save_fil_mask_dir, f'fil_mask_{i:04d}.png')
-            img = Image.fromarray((mask_filter.astype(np.uint8) * 255), mode="L")
-            img.save(save_path)
-        ###################################################################
+        for i, path in zip(idx, tif_paths):
+            print(i)
 
+            ################### filter mask by threhold ######################
+            arr_filter = np.array(Image.open(os.path.join(save_fil_dir, f'sato_{i:04d}.tif')))
+            # thr_filter = 50
+            mask_filter = arr_filter>thr_filter
+            # #mask_filter = apply_hysteresis_threshold(arr_filter, low=15, high=100)
+            # #mask_filter = filters.threshold_local(arr_filter, block_size=11,method='gaussian',offset=-.01)
+            # mask_filter = morphology.binary_closing(mask_filter, morphology.disk(1))
+            # mask_filter = morphology.remove_small_objects(mask_filter, min_size=15)
+            # arr_filter[~mask_filter] = 0
 
-
-        ##################### mask by threshold ####################
-        arr_orig = np.array(Image.open(path))
-        # thr_thr = 26
-        mask_thr = arr_orig>thr_thr
-        # #mask = apply_hysteresis_threshold(arr_uint8, low=80, high=200)
-        # mask_thr = morphology.binary_closing(mask_thr, morphology.disk(1))
-        # mask_thr = morphology.remove_small_objects(mask_thr, min_size=15)
-        # arr_orig[~mask_thr] = 0
-        
-        if save_tif:
-            mask_thr = mask_thr.astype(np.uint8) * 255
-            save_path = os.path.join(save_thr_mask_dir, f'thr_{i:04d}.tif')
-            tiff.imwrite(save_path, mask_thr)
-        else:
-            save_path = os.path.join(save_thr_mask_dir, f'thr_{i:04d}.png')
-            img = Image.fromarray((mask_thr.astype(np.uint8) * 255), mode="L")
-            img.save(save_path)
-        ############################################################
+            if save_tif:
+                mask_filter = mask_filter.astype(np.uint8) * 255
+                save_path = os.path.join(save_fil_mask_dir, f'fil_mask_{i:04d}.tif')
+                tiff.imwrite(save_path, mask_filter)
+            else:
+                save_path = os.path.join(save_fil_mask_dir, f'fil_mask_{i:04d}.png')
+                img = Image.fromarray((mask_filter.astype(np.uint8) * 255), mode="L")
+                img.save(save_path)
+            ###################################################################
 
 
 
-        ############ final vessel mask by mask_filter+mask_thr ##############
-        mask = (mask_filter + mask_thr)>0
-
-        if save_tif:
-            mask = mask.astype(np.uint8) * 255
-            save_path = os.path.join(save_mask_dir, f'mask_{i:04d}.tif')
-            tiff.imwrite(save_path, mask)
-        else:
-            save_path = os.path.join(save_mask_dir, f'mask_{i:04d}.png')
-            img = Image.fromarray((mask.astype(np.uint8) * 255), mode="L")
-            img.save(save_path)
-        #####################################################################
-        
-
-
-        # #diameter_mm_uniform = diameter_mm_uniform * spacing_zyx[0]
-        # mask_diameter = qim3d.processing.local_thickness(mask, visualize=False, axis=0)
-        # # mask_diameter[mask_diameter<3] = 0
-        # img = Image.fromarray(mask_diameter)
-        # save_path = os.path.join(save_thickness_dir, f'sato_thr_loc_{i:04d}.tif')
-        # img.save(save_path)
-
-        # # plt.imshow(mask_diameter)
-        # # plt.axis('off')
-        # # save_path = os.path.join(save_thickness_dir, f'sato_thr_loc_{i:04d}.png')
-        # # plt.savefig(save_path,bbox_inches='tight', pad_inches = 0)
-        # # plt.close()
+            ##################### mask by threshold ####################
+            arr_orig = np.array(Image.open(path))
+            # thr_thr = 26
+            mask_thr = arr_orig>thr_thr
+            # #mask = apply_hysteresis_threshold(arr_uint8, low=80, high=200)
+            # mask_thr = morphology.binary_closing(mask_thr, morphology.disk(1))
+            # mask_thr = morphology.remove_small_objects(mask_thr, min_size=15)
+            # arr_orig[~mask_thr] = 0
+            
+            if save_tif:
+                mask_thr = mask_thr.astype(np.uint8) * 255
+                save_path = os.path.join(save_thr_mask_dir, f'thr_{i:04d}.tif')
+                tiff.imwrite(save_path, mask_thr)
+            else:
+                save_path = os.path.join(save_thr_mask_dir, f'thr_{i:04d}.png')
+                img = Image.fromarray((mask_thr.astype(np.uint8) * 255), mode="L")
+                img.save(save_path)
+            ############################################################
 
 
-        # # #I = exposure.equalize_adapthist(arr_, clip_limit=0.01)
-        # # #img = Image.fromarray(I)
-        # # #save_path = os.path.join(save_dir, f'brain_{i:04d}.tif')
-        # # #img.save(save_path)
+        filter_mask_paths = glob.glob(os.path.join(save_fil_mask_dir, f'*.png'))
+        filter_mask_paths = sorted(filter_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
+        thr_mask_paths = glob.glob(os.path.join(save_thr_mask_dir, f'*.png'))
+        thr_mask_paths = sorted(thr_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
+        step = 4
+        ############## loc thichness of filter mask ##############
+        filter_loc = get_loc_thichness(filter_mask_paths, step=step)
+        save_html = os.path.join(root_path, f'loc_filter_{thr}.html')
+        plot_3d_save(filter_loc>0, value_map=filter_loc, save_html=save_html)
+        # plot_3d_show(mask_filter, mask_diamfilter_loceter_filter)
 
-
-    def get_loc_thichness(paths, step=1):
-        volumn = []
-        for path in paths[::step]:
-            array = np.array(Image.open(path))>0
-            array = array[::step,::step]
-            volumn.append(array)
-        volumn = np.array(volumn)
-        loc_thichness = qim3d.processing.local_thickness(volumn, visualize=False, axis=0)
-        return loc_thichness
-
-    filter_mask_paths = glob.glob(os.path.join(save_fil_mask_dir, f'*.png'))
-    filter_mask_paths = sorted(filter_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
-
-    thr_mask_paths = glob.glob(os.path.join(save_thr_mask_dir, f'*.png'))
-    thr_mask_paths = sorted(thr_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
-
-    final_mask_paths = glob.glob(os.path.join(save_mask_dir, f'*.png'))
-    final_mask_paths = sorted(final_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
-
-
-    step = 4
-    ############## loc thichness of filter mask ##############
-    filter_loc = get_loc_thichness(filter_mask_paths, step=step)
-    save_html = os.path.join(root_path, 'loc_filter.html')
-    plot_3d_save(filter_loc>0, value_map=filter_loc, save_html=save_html)
-    # plot_3d_show(mask_filter, mask_diamfilter_loceter_filter)
-
-    ############## loc thichness of threshold mask ##############
-    thr_loc = get_loc_thichness(thr_mask_paths, step=step)
-    save_html = os.path.join(root_path, 'loc_thr.html')
-    plot_3d_save(thr_loc>0, value_map=thr_loc, save_html=save_html)
-    # plot_3d_show(mask_thr, thr_loc)
-
-    ############ loc thichness of final combined mask #############
-    final_loc = get_loc_thichness(final_mask_paths, step=step)
-    save_html = os.path.join(root_path, 'loc_final.html')
-    plot_3d_save(final_loc>0, value_map=final_loc, save_html=save_html)
-
-    for i in range(final_loc.shape[0]):
-        save_path = os.path.join(save_thickness_dir, f'loc_{i:04d}.tif')
-        tiff.imwrite(save_path, final_loc[i])
+        ############## loc thichness of threshold mask ##############
+        thr_loc = get_loc_thichness(thr_mask_paths, step=step)
+        save_html = os.path.join(root_path, f'loc_thr_{thr}.html')
+        plot_3d_save(thr_loc>0, value_map=thr_loc, save_html=save_html)
+        # plot_3d_show(mask_thr, thr_loc)
