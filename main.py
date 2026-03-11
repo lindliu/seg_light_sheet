@@ -89,6 +89,31 @@ def plot_3d_save(mask, spacing_zyx=[1,1,1], value_map=None, save_html=None, seed
     # fig.show()
 
 
+##### get thresholds #####
+def get_thresholds(paths, quatiles=[99], bits=8):
+    maxv = 2**bits
+    if bits==8:
+        counts = np.zeros(maxv, dtype=np.uint8)
+        counts = np.zeros(maxv, dtype=np.uint8)
+    total = 0
+
+    for path in paths:
+        imarray = np.array(Image.open(path))
+        flat = imarray.ravel()
+        counts = counts+np.bincount(flat, minlength=maxv)
+        total += flat.size
+    cdf = np.cumsum(counts)
+
+    thresholds = {}
+    for q in quatiles:
+        target = int(np.ceil((q / 100.0) * total))
+        idx = int(np.searchsorted(cdf, target, side="left"))
+        thresholds[q] = idx  # 这个 idx 就是 q% 的像素强度阈值
+    print(thresholds)
+
+    return thresholds
+    
+
 def get_loc_thichness(paths, step=1):
     volumn = []
     for path in paths[::step]:
@@ -116,7 +141,6 @@ for root_path in root_paths[:]:
     os.makedirs(save_fil_dir, exist_ok=True)
     idx = list(np.arange(len(tif_paths)))
 
-
     # ###################### process image by filter #########################
 
     # for i, path in zip(idx, tif_paths):
@@ -139,29 +163,27 @@ for root_path in root_paths[:]:
     # #########################################################################
 
 
-    ##### get thresholds #####
-    def get_thresholds(paths, quatiles=[99], bits=8):
-        maxv = 2**bits
-        if bits==8:
-            counts = np.zeros(maxv, dtype=np.uint8)
-            counts = np.zeros(maxv, dtype=np.uint8)
-        total = 0
+    # # org_dir  = '2_8bit'
+    # # org_paths = glob.glob(os.path.join(root_path, f'{org_dir}/*.tif'))
+    # # org_paths = sorted(org_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
-        for path in paths:
-            imarray = np.array(Image.open(path))
-            flat = imarray.ravel()
-            counts = counts+np.bincount(flat, minlength=maxv)
-            total += flat.size
-        cdf = np.cumsum(counts)
+    # # filter_dir = '3_filter'
+    # # filter_paths = glob.glob(os.path.join(root_path, f'{filter_dir}/*.tif'))
+    # # filter_paths = sorted(filter_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
+    
+    # # save_weig_dir = os.path.join(root_path, '3_weighted_tif')
+    # # os.makedirs(save_weig_dir, exist_ok=True)
+    
+    # # i=0
+    # # for org_path, filter_path in zip(org_paths,filter_paths):
+    # #     org_img = np.array(Image.open(org_path))
+    # #     filter_img = np.array(Image.open(filter_path))
+    # #     print(np.mean(org_img), np.mean(filter_img))
 
-        thresholds = {}
-        for q in quatiles:
-            target = int(np.ceil((q / 100.0) * total))
-            idx = int(np.searchsorted(cdf, target, side="left"))
-            thresholds[q] = idx  # 这个 idx 就是 q% 的像素强度阈值
-        print(thresholds)
-
-        return thresholds
+    # #     img = Image.fromarray(org_img*filter_img)
+    # #     save_path = os.path.join(save_weig_dir, f'weighted_{i:04d}.tif')
+    # #     img.save(save_path)
+    # #     i += 1
 
 
     filter_paths = glob.glob(os.path.join(save_fil_dir, f'sato_*.tif'))

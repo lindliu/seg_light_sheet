@@ -92,7 +92,32 @@ def plot_3d_save(mask, spacing_zyx=[1,1,1], value_map=None, save_html=None, seed
     # fig.show()
 
 
-def get_loc_thichness(paths, step=1):
+##### get thresholds #####
+def get_thresholds(paths, quatiles=[99], bits=8):
+    maxv = 2**bits
+    if bits==8:
+        counts = np.zeros(maxv, dtype=np.uint8)
+        counts = np.zeros(maxv, dtype=np.uint8)
+    total = 0
+
+    for path in paths:
+        imarray = np.array(Image.open(path))
+        flat = imarray.ravel()
+        counts = counts+np.bincount(flat, minlength=maxv)
+        total += flat.size
+    cdf = np.cumsum(counts)
+
+    thresholds = {}
+    for q in quatiles:
+        target = int(np.ceil((q / 100.0) * total))
+        idx = int(np.searchsorted(cdf, target, side="left"))
+        thresholds[q] = idx  # 这个 idx 就是 q% 的像素强度阈值
+    print(thresholds)
+
+    return thresholds
+
+
+def get_loc_thichness(paths, step=1, spacing=[1,1,1]):
     volumn = []
     for path in paths[::step]:
         array = np.array(Image.open(path))>0
@@ -110,20 +135,24 @@ root_paths = glob.glob(os.path.join(os.getcwd(),'data/*'))
 print(root_paths)
 
 
-for root_path in root_paths[:1]:
+for root_path in root_paths[:]:
     
     print(root_path)
-    tif_paths = glob.glob(os.path.join(root_path, '2_8bit/*'))
-    tif_paths = sorted(tif_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
+    filter_mask_99_dir = '3_filter_mask_99.0'
+    filter_mask_99_paths = glob.glob(os.path.join(root_path, f'{filter_mask_99_dir}/*.png'))
+    filter_mask_99_paths = sorted(filter_mask_99_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
-    filter_dir = '3_filter_mask_99.4'
-    filter_mask_paths = glob.glob(os.path.join(root_path, f'{filter_dir}/*.png'))
+    filter_mask_dir = '3_filter_mask_99.5'
+    filter_mask_paths = glob.glob(os.path.join(root_path, f'{filter_mask_dir}/*.png'))
     filter_mask_paths = sorted(filter_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
-    thr_dir = '3_thr_mask_99.0'
-    thr_mask_paths = glob.glob(os.path.join(root_path, f'{thr_dir}/*.png'))
+    thr_mask_dir = '3_thr_mask_99.0'
+    thr_mask_paths = glob.glob(os.path.join(root_path, f'{thr_mask_dir}/*.png'))
     thr_mask_paths = sorted(thr_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
+    thr_mask_996_dir  = '3_thr_mask_99.6'
+    thr_mask_996_paths = glob.glob(os.path.join(root_path, f'{thr_mask_996_dir}/*'))
+    thr_mask_996_paths = sorted(thr_mask_996_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
 
     save_mask_dir = os.path.join(root_path, '4_mask')
@@ -133,14 +162,20 @@ for root_path in root_paths[:1]:
 
     save_tif = True  #  False # 
     i = 0
-    for filter_mask_path, thr_mask_path in zip(filter_mask_paths, thr_mask_paths):
-        print(os.path.split(filter_mask_path)[1], os.path.split(thr_mask_path)[1])
-
+    for filter_mask_99_path, filter_mask_path, thr_mask_path, thr_mask_996_path in zip(filter_mask_99_paths, filter_mask_paths, thr_mask_paths, thr_mask_996_paths):
+        mask_filter_99 = np.array(Image.open(filter_mask_99_path))>0
         mask_filter = np.array(Image.open(filter_mask_path))>0
         mask_thr = np.array(Image.open(thr_mask_path))>0
+        mask_thr_996 = np.array(Image.open(thr_mask_996_path))>0
 
         ############ final vessel mask by mask_filter+mask_thr ##############
-        mask = (mask_filter + mask_thr)>0
+        mask1 = (mask_thr*mask_filter_99)>0  # remove low confidence area from filter mask
+        mask2 = (mask1 + mask_filter)>0      # add high confidence area from filter mask
+        mask = (mask2 + mask_thr_996)>0      # add high confidence area from threshold mask
+        # mask = (mask_thr*mask_filter_97 + mask_filter + mask_thr_996)>0
+        if i%100==0:
+            print(mask_thr.sum(), mask_filter_99.sum(), mask1.sum(), mask2.sum(), mask.sum())
+
 
         if save_tif:
             mask = mask.astype(np.uint8) * 255
@@ -159,10 +194,11 @@ for root_path in root_paths[:1]:
         final_mask_paths = glob.glob(os.path.join(save_mask_dir, f'*.png'))
     final_mask_paths = sorted(final_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
-    step = 4
     ############ loc thichness of final combined mask #############
-    final_loc = get_loc_thichness(final_mask_paths, step=1)
+    spacing = [5,5.91,5.91] #5,5.91,5.91
+    final_loc = get_loc_thichness(final_mask_paths, step=1, spacing=spacing)
     save_html = os.path.join(root_path, 'loc_final.html')
+    step = 4
     plot_3d_save(final_loc[::step,::step,::step]>0, value_map=final_loc[::step,::step,::step], save_html=save_html)
 
     for i in range(final_loc.shape[0]):
