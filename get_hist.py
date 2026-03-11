@@ -15,6 +15,7 @@ for root_path in root_paths:
     loc_paths = glob.glob(os.path.join(root_path, f'*.tif'))
     volumn = []
     for loc_path in loc_paths:
+        print(loc_path)
         array = np.array(Image.open(loc_path))
         if array.shape[0]>1000:
             volumn.append(array)
@@ -26,6 +27,7 @@ for root_path in root_paths:
         "thickness": unique_values,
         name: counts
     })
+    df.to_csv(name+'.csv', index=False)
     dfs.append(df)
 
 df_all = dfs[0]
