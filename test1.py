@@ -97,6 +97,8 @@ def get_loc_thichness(paths, step=1, spacing=[1,1,1]):
 
 root_paths = glob.glob(os.path.join('./data/*'))
 for root_path in root_paths:
+    print(root_path)
+    
     final_mask_paths = glob.glob(os.path.join(root_path, '4_mask', f'*.tif'))
     final_mask_paths = sorted(final_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
     # print(final_mask_paths)
