@@ -13,20 +13,23 @@ for root_path in root_paths:
     name = os.path.split(os.path.split(root_path)[0])[1]
 
     loc_paths = glob.glob(os.path.join(root_path, f'*.tif'))
-    volumn = []
+    hist_dict = {}
     for loc_path in loc_paths:
         print(loc_path)
         array = np.array(Image.open(loc_path))
-        if array.shape[0]>1000:
-            volumn.append(array)
-    volumn = np.array(volumn)
-    unique_values, counts = np.unique(volumn, return_counts=True)
-
+        unique_values, counts = np.unique(array, return_counts=True)
+        
+        for value, count in zip(unique_values, counts):
+            if value in hist_dict:
+                hist_dict[value] += count     # accumulate
+            else:
+                hist_dict[value] = count      # initialize
 
     df = pd.DataFrame({
-        "thickness": unique_values,
-        name: counts
+        "thickness": list(hist_dict.keys()),
+        name: list(hist_dict.values())
     })
+    df = df.sort_values("thickness")
     df.to_csv(name+'.csv', index=False)
     dfs.append(df)
 
@@ -41,6 +44,6 @@ for df in dfs[1:]:
 df_all = df_all.sort_values("thickness")
 
 # Save
-df_all.to_csv("thickness_merged.csv", index=False)
+df_all.to_csv("thickness_statictics.csv", index=False)
 
 print("Saved: thickness_merged.csv")

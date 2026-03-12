@@ -117,15 +117,25 @@ def get_thresholds(paths, quatiles=[99], bits=8):
     return thresholds
 
 
-def get_loc_thichness(paths, step=1, spacing=[1,1,1]):
-    volumn = []
+from scipy.ndimage import zoom
+def get_loc_thichness(paths, step=1, spacing_zyx=[1,1,1], target_spacing=None):
+    dz, dy, dx = spacing_zyx
+    if target_spacing is None:
+        target_spacing = min(spacing_zyx)
+    factors = (dz / target_spacing, dy / target_spacing, dx / target_spacing)
+
+    volume = []
     for path in paths[::step]:
         array = np.array(Image.open(path))>0
         array = array[::step,::step]
-        volumn.append(array)
-    volumn = np.array(volumn)
-    loc_thichness = qim3d.processing.local_thickness(volumn, visualize=False, axis=0)
-    return loc_thichness
+        volume.append(array)
+    volume = np.array(volume)
+    vol_iso = zoom(volume, zoom=factors, order=1)
+    print(vol_iso.shape)
+
+    loc_thichness = qim3d.processing.local_thickness(volume, visualize=False)
+    loc_thichness_phy = loc_thichness * target_spacing
+    return loc_thichness_phy
 
 
 num_re = re.compile(r'(\d+)(?!.*\d)')
@@ -195,8 +205,8 @@ for root_path in root_paths[:]:
     final_mask_paths = sorted(final_mask_paths, key=lambda x: int(num_re.search(os.path.split(x)[1]).group(1)))
 
     ############ loc thichness of final combined mask #############
-    spacing = [5,5.91,5.91] #5,5.91,5.91
-    final_loc = get_loc_thichness(final_mask_paths, step=1, spacing=spacing)
+    spacing_zyx = [5,5.91,5.91] #5,5.91,5.91
+    final_loc = get_loc_thichness(final_mask_paths, step=1, spacing_zyx=spacing_zyx)
     save_html = os.path.join(root_path, 'loc_final.html')
     step = 4
     plot_3d_save(final_loc[::step,::step,::step]>0, value_map=final_loc[::step,::step,::step], save_html=save_html)
