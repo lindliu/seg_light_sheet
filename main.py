@@ -141,26 +141,26 @@ for root_path in root_paths[:]:
     os.makedirs(save_fil_dir, exist_ok=True)
     idx = list(np.arange(len(tif_paths)))
 
-    # ###################### process image by filter #########################
+    ###################### process image by filter #########################
 
-    # for i, path in zip(idx, tif_paths):
-    #     print(i)
-    #     arr_ = np.array(Image.open(path))
+    for i, path in zip(idx, tif_paths):
+        print(i)
+        arr_ = np.array(Image.open(path))
 
-    #     arr = filters.gaussian(arr_, sigma=1, preserve_range=True)
-    #     #arr = frangi(arr, sigmas=np.arange(.1,20,1), black_ridges=False)
-    #     arr = sato(arr, sigmas=np.arange(.01,6,.3), black_ridges=False)
-    #     #arr = meijering(arr, sigmas=np.arange(.01,4,.2), black_ridges=False)
-    #     #arr = hessian(ararrr_, sigmas=[1,2,3,3,5])
+        arr = filters.gaussian(arr_, sigma=1, preserve_range=True)
+        #arr = frangi(arr, sigmas=np.arange(.1,20,1), black_ridges=False)
+        arr = sato(arr, sigmas=np.arange(.01,6,.3), black_ridges=False)
+        #arr = meijering(arr, sigmas=np.arange(.01,4,.2), black_ridges=False)
+        #arr = hessian(ararrr_, sigmas=[1,2,3,3,5])
 
-    #     # Normalize per-slice (or globally if preferred)
-    #     arr_norm = arr / arr.max() if arr.max() != 0 else arr
-    #     arr_filter = (arr_norm * 255).astype(np.uint8)
+        # Normalize per-slice (or globally if preferred)
+        arr_norm = arr / arr.max() if arr.max() != 0 else arr
+        arr_filter = (arr_norm * 255).astype(np.uint8)
 
-    #     img = Image.fromarray(arr_filter)
-    #     save_path = os.path.join(save_fil_dir, f'sato_{i:04d}.tif')
-    #     img.save(save_path)
-    # #########################################################################
+        img = Image.fromarray(arr_filter)
+        save_path = os.path.join(save_fil_dir, f'sato_{i:04d}.tif')
+        img.save(save_path)
+    #########################################################################
 
 
     # # org_dir  = '2_8bit'
